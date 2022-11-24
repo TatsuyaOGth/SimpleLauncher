@@ -1,0 +1,2 @@
+# SimpleLauncher
+Simple application launcher
