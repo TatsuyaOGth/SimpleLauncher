@@ -88,9 +88,28 @@ public class SimpleLauncher : IDisposable
         }
         while (!_process.WaitForExit(intervalMs));
 
-        int exitCode = _process.ExitCode;
-        return exitCode;
+        return _process.ExitCode;
     }
+
+    public async Task<int> ProcessStartAsync()
+    {
+        if (_parameter == null)
+            throw new InvalidOperationException("Parameter object is null");
+
+        if (_parameter.ApplicationPaths == null)
+            throw new InvalidOperationException("Application paths is null");
+
+        if (_process != null && _process.HasExited == false)
+            throw new InvalidOperationException("Process already running");
+
+        string filename = _parameter.ApplicationPaths[_parameter.LaunchTarget];
+        _process = Process.Start(filename);
+        
+        await _process.WaitForExitAsync();
+
+        return _process.ExitCode;
+    }
+
 
     public void SetLaunchTarget(int index)
     {

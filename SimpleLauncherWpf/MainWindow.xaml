@@ -1,0 +1,79 @@
+﻿<Window x:Class="SimpleLauncherWpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SimpleLauncherWpf"
+        mc:Ignorable="d"
+        Title="Application Launcher" Height="450" Width="450">
+    <Window.DataContext>
+        <local:MainWindowViewModel/>
+    </Window.DataContext>
+    
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="b2v"/>
+    </Window.Resources>
+
+    <Grid>
+
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="リロード" Command="{Binding ReloadCommand}"/>
+            </ContextMenu>
+        </Grid.ContextMenu>
+
+        <!-- Application Select View -->
+        <Grid
+            Visibility="{Binding IsProcessNotRunning.Value, Mode=OneWay, Converter={StaticResource b2v}, FallbackValue=Visible}">
+
+            <ListView
+                ItemsSource="{Binding ApplicationItems}"
+                Background="Transparent"
+                HorizontalContentAlignment="Stretch">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid
+                            Height="40"
+                            Margin="5">
+                            <Button
+                                Content="{Binding Name.Value}"
+                                Command="{Binding SelectCommand}"
+                                HorizontalAlignment="Stretch"
+                                FontSize="14"/>
+                            <TextBlock
+                                Text="{Binding Index.Value, StringFormat={}{0:D2}}"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Left"
+                                Width="20"
+                                Margin="5"
+                                FontSize="14"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <DockPanel LastChildFill="False">
+                <TextBlock
+                DockPanel.Dock="Bottom"
+                Text="{Binding Message.Value}"
+                FontSize="12"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                TextWrapping="Wrap"
+                Margin="5"/>
+            </DockPanel>
+        </Grid>
+
+        <!-- Process View -->
+        <Grid
+            Visibility="{Binding IsProcessRunning.Value, Mode=OneWay, Converter={StaticResource b2v}, FallbackValue=Visible}">
+            <Grid
+                Background="LightGray"
+                Margin="5">
+                <TextBlock
+                    Text="{Binding ProcessStatus.Value}"
+                    Margin="5"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
