@@ -6,15 +6,15 @@ using System.IO;
 using System.ComponentModel;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using Reactive.Bindings;
 using Reactive.Bindings.Extensions;
-using SimpleLauncher;
-using Accessibility;
 using System.Reactive.Linq;
 using System.Reactive.Disposables;
 using System.Windows;
 using System.Windows.Threading;
-using System.Threading;
+
+using SimpleLauncher;
 
 namespace SimpleLauncherWpf
 {
@@ -24,14 +24,16 @@ namespace SimpleLauncherWpf
 
         public ReactiveCollection<ApplicationSelectItem> ApplicationItems { get; set; } = new ReactiveCollection<ApplicationSelectItem>();
 
-        public ReactivePropertySlim<bool?> IsProcessRunning { get; } = new ReactivePropertySlim<bool?>();
-        public ReadOnlyReactivePropertySlim<bool?> IsProcessNotRunning { get; private set; }
+        public ReactiveProperty<bool> IsProcessRunning { get; } = new ReactiveProperty<bool>();
+        public ReadOnlyReactivePropertySlim<bool> IsProcessNotRunning { get; private set; }
 
         public ReactivePropertySlim<string> ProcessStatus { get; } = new ReactivePropertySlim<string>();
 
         public ReactivePropertySlim<string> Message { get; } = new ReactivePropertySlim<string>();
 
-        public ReactiveCommand ReloadCommand { get; } = new ReactiveCommand();
+        public ReactiveCommand ReloadCommand { get; private set; }
+
+        public ReactiveCommand<EventArgs> LoadedCommand { get; } = new ReactiveCommand<EventArgs>();
 
         private SimpleLauncher.SimpleLauncher _launcher = new();
 
@@ -46,6 +48,7 @@ namespace SimpleLauncherWpf
 
             IsProcessRunning.Value = false;
 
+            ReloadCommand = IsProcessRunning.Select(x => !x).ToReactiveCommand();
             ReloadCommand.Subscribe(() => InitializeParameter());
 
             IsProcessNotRunning = IsProcessRunning
@@ -53,17 +56,24 @@ namespace SimpleLauncherWpf
                 .ToReadOnlyReactivePropertySlim()
                 .AddTo(_disposables);
 
+            
+
             _timer.Elapsed += (s, e) => UpdateProcessStatus();
 
-            bool ready = InitializeParameter();
-            if (ready)
+            LoadedCommand.Subscribe(_ =>
             {
-                RunProcess();
-            }
+                bool ready = InitializeParameter();
+                if (ready)
+                {
+                    RunProcess();
+                }
+            });
         }
 
         bool InitializeParameter()
         {
+            if (IsProcessRunning.Value) return false;
+
             ApplicationItems.Clear();
             Message.Value = string.Empty;
             string filepath = _launcher.DefaultFilePath;
@@ -101,25 +111,34 @@ namespace SimpleLauncherWpf
         {
             IsProcessRunning.Value = true;
             ProcessStatus.Value = "Process starting...";
+            _timer.Start();
+            int exitCode = -1;
 
-            Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
-                _timer.Start();
-                int exitCode = await _launcher.ProcessStartAsync();
+                exitCode = await _launcher.ProcessStartAsync();
+            });
+
+            task.ContinueWith(ca =>
+            {
                 _timer.Stop();
+
+                string resultMsg = ca.Exception is AggregateException ex
+                    ? $"例外が発生しました: {ex.InnerException?.GetType()} - {ex.InnerException?.Message}"
+                    : $"プロセスを終了しました: EXIT_CODE={exitCode}";
 
                 _dispatcher.Invoke(() =>
                 {
                     ProcessStatus.Value = "Process stopped";
                     IsProcessRunning.Value = false;
-                    Message.Value = $"プロセスを終了しました: EXIT_CODE={exitCode}";
+                    Message.Value = resultMsg;
                 });
             });
         }
 
         void UpdateProcessStatus()
         {
-            if (IsProcessRunning.Value ?? false)
+            if (IsProcessRunning.Value)
             {
                 try
                 {
@@ -148,15 +167,22 @@ namespace SimpleLauncherWpf
                         _sb.AppendLine("Status = Not Responding");
                     }
                 }
-                catch (Exception ex )
+                catch (Exception ex)
                 {
                     _sb.Append(ex.ToString());
                 }
 
-                _dispatcher.Invoke(() =>
+                try
                 {
-                    ProcessStatus.Value = _sb.ToString();
-                });
+                    _dispatcher.Invoke(() =>
+                    {
+                        ProcessStatus.Value = _sb.ToString();
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                }
             }
         }
 
@@ -174,6 +200,7 @@ namespace SimpleLauncherWpf
 
         public void Dispose()
         {
+            _launcher.Dispose();
             _disposables.Dispose();
         }
     }
