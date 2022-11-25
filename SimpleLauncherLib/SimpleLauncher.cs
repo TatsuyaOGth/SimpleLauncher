@@ -65,18 +65,7 @@ public class SimpleLauncher : IDisposable
 
     public int ProcessStart(Action? whileAction = null, int intervalMs = 1000)
     {
-        if (_parameter == null)
-            throw new InvalidOperationException("Parameter object is null");
-
-        if (_parameter.ApplicationPaths == null)
-            throw new InvalidOperationException("Application paths is null");
-
-        if (_process != null && _process.HasExited == false)
-            throw new InvalidOperationException("Process already running");
-
-        _process = new Process();
-        _process.StartInfo.FileName = _parameter.ApplicationPaths[_parameter.LaunchTarget];
-        _process.Start();
+        _process = StartProcess();
 
         do
         {
@@ -88,9 +77,18 @@ public class SimpleLauncher : IDisposable
         }
         while (!_process.WaitForExit(intervalMs));
 
-        int exitCode = _process.ExitCode;
-        return exitCode;
+        return _process.ExitCode;
     }
+
+    public async Task<int> ProcessStartAsync()
+    {
+        _process = StartProcess();
+
+        await _process.WaitForExitAsync();
+
+        return _process.ExitCode;
+    }
+
 
     public void SetLaunchTarget(int index)
     {
@@ -118,6 +116,21 @@ public class SimpleLauncher : IDisposable
             _process.CloseMainWindow();
             _process.Close();
         }
+    }
+
+    private Process StartProcess()
+    {
+        if (_parameter == null)
+            throw new InvalidOperationException("Parameter object is null");
+
+        if (_parameter.ApplicationPaths == null)
+            throw new InvalidOperationException("Application paths is null");
+
+        if (_process != null && _process.HasExited == false)
+            _process.Kill();
+
+        string filename = _parameter.ApplicationPaths[_parameter.LaunchTarget];
+        return Process.Start(filename);
     }
 }
 

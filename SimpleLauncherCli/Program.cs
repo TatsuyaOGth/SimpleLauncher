@@ -93,7 +93,7 @@ do
 
             if (processException != null)
             {
-                Console.WriteLine($"[E] {processException.GetType}: {processException.Message}");
+                Console.WriteLine($"[E] {processException.GetType()}: {processException.Message}");
                 Console.WriteLine();
             }
 
