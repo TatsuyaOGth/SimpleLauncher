@@ -1,11 +1,22 @@
-﻿using System;
+﻿using CommandLine;
+using CommandLine.Text;
+using SimpleLauncherCli;
 
 int BaseExitCode = 100000;
 int QuitExitCode = 200000;
 
+// Parse arguments (set defaults if not arguments)
+Options? options = new();
+Parser.Default.ParseArguments<Options>(args)
+    .WithParsed(parseRes => options = parseRes);
+
+
 var launcher = new SimpleLauncher.SimpleLauncher();
 
-string filepath = launcher.DefaultFilePath;
+string filepath
+    = string.IsNullOrEmpty(options.ParameterFilePath)
+    ? launcher.DefaultFilePath
+    : options.ParameterFilePath;
 
 // If parameter file is not exists, create template.
 if (!launcher.IsFileExists())
@@ -101,7 +112,15 @@ do
             var appPaths = launcher.GetApplicationPaths();
             for (int i = 0; i < launcher.ApplicationCount; ++i)
             {
-                Console.WriteLine($"{i}: {Path.GetFileName(appPaths[i])}");
+                switch (options.DisplayType)
+                {
+                    case DisplayType.FileName:
+                        Console.WriteLine($"{i}: {Path.GetFileNameWithoutExtension(appPaths[i])}");
+                        break;
+                    case DisplayType.DirectoryName:
+                        Console.WriteLine($"{i}: {Path.GetFileName(Path.GetDirectoryName(appPaths[i]))}");
+                        break;
+                }
             }
 
             Console.Write(">> ");
