@@ -15,6 +15,7 @@ using System.Windows;
 using System.Windows.Threading;
 
 using SimpleLauncher;
+using System.Xml.Linq;
 
 namespace SimpleLauncherWpf
 {
@@ -41,6 +42,9 @@ namespace SimpleLauncherWpf
         private Dispatcher _dispatcher;
         private System.Timers.Timer _timer = new(1000);
         private StringBuilder _sb = new StringBuilder();
+        private Options? _options;
+
+        private static readonly string s_optionsFileName = "Options.json";
 
         public MainWindowViewModel()
         {
@@ -87,14 +91,15 @@ namespace SimpleLauncherWpf
             {
                 try
                 {
-                    _launcher.LoadParameters();
+                    LoadOptions();
 
+                    _launcher.LoadParameters();
                     int n = _launcher.ApplicationCount;
                     var apps = _launcher.GetApplicationPaths();
                     for (int i = 0; i < n; ++i)
                     {
-                        string name = Path.GetFileNameWithoutExtension(apps[i]);
-                        ApplicationItems.Add(new ApplicationSelectItem(i, name, ApplicationSelected));
+                        string? name = GetApplicationName(apps[i], i) ?? "null";
+                        ApplicationItems.Add(new ApplicationSelectItem(i, name, OnApplicationSelected));
                     }
                     Message.Value = $"パラメータファイルを読み込みました: {filepath}";
                     return true;
@@ -105,6 +110,53 @@ namespace SimpleLauncherWpf
                 }
             }
             return false;
+        }
+
+        void LoadOptions()
+        {
+            string filepath = Path.Join(AppDomain.CurrentDomain.BaseDirectory, s_optionsFileName);
+
+            if (!File.Exists(filepath))
+            {
+                _options = new Options();
+                Options.SaveTo(_options, filepath);
+            }
+            else
+            {
+                _options = Options.LoadFrom(filepath);
+            }
+        }
+
+        string? GetApplicationName(string filepath, int index)
+        {
+            if (_options == null)
+            {
+                return Path.GetFileNameWithoutExtension(filepath);
+            }
+
+            switch (_options.DisplayType)
+            {
+                case DisplayType.FileName:
+                    return Path.GetFileNameWithoutExtension(filepath);
+
+                case DisplayType.DirectoryName:
+                    return Path.GetFileName(Path.GetDirectoryName(filepath));
+
+                case DisplayType.SpecificNames:
+                    if (_options.SpecificNames == null)
+                    {
+                        return Path.GetFileNameWithoutExtension(filepath);
+                    }
+                    else
+                    {
+                        if (_options.SpecificNames.Length >= index) 
+                        { 
+                            return _options.SpecificNames[index];
+                        }
+                        return Path.GetFileNameWithoutExtension(filepath);
+                    }
+            }
+            return null;
         }
 
         void RunProcess()
@@ -188,7 +240,7 @@ namespace SimpleLauncherWpf
 
 
 
-        void ApplicationSelected(int index)
+        void OnApplicationSelected(int index)
         {
             if (index < 0 || index >= _launcher.ApplicationCount)
                 return;
